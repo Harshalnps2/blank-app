@@ -17,3 +17,7 @@ A simple Streamlit app template for you to modify!
    ```
    $ streamlit run streamlit_app.py
    ```
+
+### Investment Strategy Documentation
+
+The repository includes a detailed guide for a valuation-aware FAANG+ investment program in `docs/faang_dynamic_strategy.md`. It outlines the stock universe, scoring methodology, allocation rules, rebalancing process, risk controls, performance tracking, and implementation checklist.
