@@ -20,37 +20,92 @@ export type CareEventSourceName = z.infer<typeof careEventSourceSchema>;
 // Metadata schemas (validate the contents of care_events.metadata_json)
 // -----------------------------------------------------------------------------
 
-export const feedMetadataSchema = z
+export const breastSideSchema = z.enum(["left", "right", "both"]);
+export type BreastSide = z.infer<typeof breastSideSchema>;
+
+export const bottleUnitSchema = z.enum(["ml", "oz"]);
+export type BottleUnit = z.infer<typeof bottleUnitSchema>;
+
+export const milkTypeSchema = z.enum(["breastmilk", "formula", "donor"]);
+export type MilkType = z.infer<typeof milkTypeSchema>;
+
+const breastFeedMetadataSchema = z
   .object({
-    method: z.enum(["breast", "bottle"]),
-    side: z.enum(["left", "right"]).optional(),
-    amount_ml: z.number().int().nonnegative().max(500).optional(),
+    method: z.literal("breast"),
+    side: breastSideSchema,
+    duration_minutes: z.number().int().min(0).max(240).optional(),
   })
   .strict();
+
+const bottleFeedMetadataSchema = z
+  .object({
+    method: z.literal("bottle"),
+    amount: z.number().positive().max(500),
+    unit: bottleUnitSchema,
+    milk_type: milkTypeSchema,
+  })
+  .strict();
+
+export const feedMetadataSchema = z.discriminatedUnion("method", [
+  breastFeedMetadataSchema,
+  bottleFeedMetadataSchema,
+]);
+export type FeedMetadata = z.infer<typeof feedMetadataSchema>;
+
+export const diaperContentsSchema = z.enum(["wet", "dirty", "both", "dry"]);
+export type DiaperContents = z.infer<typeof diaperContentsSchema>;
 
 export const diaperMetadataSchema = z
   .object({
-    contents: z.enum(["wet", "dirty", "both"]),
+    contents: diaperContentsSchema,
+    note: z.string().trim().max(280).optional(),
   })
   .strict();
+export type DiaperMetadata = z.infer<typeof diaperMetadataSchema>;
+
+export const sleepLocationSchema = z.enum([
+  "bassinet",
+  "crib",
+  "contact",
+  "stroller",
+  "carrier",
+  "other",
+]);
+export type SleepLocation = z.infer<typeof sleepLocationSchema>;
 
 export const sleepMetadataSchema = z
   .object({
-    location: z.enum(["bassinet", "crib", "contact", "other"]).optional(),
+    location: sleepLocationSchema.optional(),
   })
   .strict();
+export type SleepMetadata = z.infer<typeof sleepMetadataSchema>;
+
+export const soothingTechniqueSchema = z.enum([
+  "rocking",
+  "burping",
+  "swaddle",
+  "pacifier",
+  "white_noise",
+  "diaper_check",
+  "feeding_attempt",
+  "skin_to_skin",
+  "other",
+]);
+export type SoothingTechnique = z.infer<typeof soothingTechniqueSchema>;
 
 export const soothingMetadataSchema = z
   .object({
-    technique: z.enum(["rocking", "shushing", "swaddle", "pacifier", "walking", "other"]),
+    technique: soothingTechniqueSchema,
   })
   .strict();
+export type SoothingMetadata = z.infer<typeof soothingMetadataSchema>;
 
 export const noteMetadataSchema = z
   .object({
-    text: z.string().min(1).max(280),
+    text: z.string().trim().min(1, "Add a note before saving.").max(280),
   })
   .strict();
+export type NoteMetadata = z.infer<typeof noteMetadataSchema>;
 
 // -----------------------------------------------------------------------------
 // Row-level input schema (what the repository accepts)
@@ -115,6 +170,50 @@ export const careEventUpdateSchema = z
   .strict();
 
 export type CareEventUpdateInput = z.infer<typeof careEventUpdateSchema>;
+
+// -----------------------------------------------------------------------------
+// Logging intents (what the night dashboard sends; the server enriches them
+// with baby_id / caregiver_id and forwards to the repository).
+// -----------------------------------------------------------------------------
+
+export const logFeedIntentSchema = z.object({
+  type: z.literal("feed"),
+  metadata: feedMetadataSchema,
+  started_at: isoDateTime.optional(),
+});
+
+export const logDiaperIntentSchema = z.object({
+  type: z.literal("diaper"),
+  metadata: diaperMetadataSchema,
+  started_at: isoDateTime.optional(),
+});
+
+export const logSleepStartIntentSchema = z.object({
+  type: z.literal("sleep"),
+  metadata: sleepMetadataSchema,
+  started_at: isoDateTime.optional(),
+});
+
+export const logSoothingIntentSchema = z.object({
+  type: z.literal("soothing"),
+  metadata: soothingMetadataSchema,
+  started_at: isoDateTime.optional(),
+});
+
+export const logNoteIntentSchema = z.object({
+  type: z.literal("note"),
+  metadata: noteMetadataSchema,
+  started_at: isoDateTime.optional(),
+});
+
+export const logCareEventIntentSchema = z.discriminatedUnion("type", [
+  logFeedIntentSchema,
+  logDiaperIntentSchema,
+  logSleepStartIntentSchema,
+  logSoothingIntentSchema,
+  logNoteIntentSchema,
+]);
+export type LogCareEventIntent = z.infer<typeof logCareEventIntentSchema>;
 
 // -----------------------------------------------------------------------------
 // Auth + onboarding

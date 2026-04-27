@@ -59,9 +59,26 @@ interface Baby {
   deleted_at: string | null;
 }
 
+interface CareEvent {
+  id: string;
+  baby_id: string;
+  caregiver_id: string;
+  night_shift_id: string | null;
+  event_type: "feed" | "diaper" | "sleep" | "soothing" | "note";
+  started_at: string;
+  ended_at: string | null;
+  duration_seconds: number | null;
+  metadata_json: Record<string, unknown>;
+  source: "manual" | "ai_parsed" | "system";
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
 const sessionsByToken = new Map<string, Session>();
 const usersByEmail = new Map<string, User>();
 const babiesByUser = new Map<string, Baby>();
+const careEvents: CareEvent[] = [];
 
 function makeUser(email: string): User {
   const existing = usersByEmail.get(email);
@@ -113,6 +130,78 @@ async function readJson(req: NextRequest): Promise<Record<string, unknown>> {
 
 function disabled(): NextResponse {
   return new NextResponse("Not Found", { status: 404 });
+}
+
+const SINGLE_OBJECT_ACCEPT = "application/vnd.pgrst.object+json";
+
+function wantsSingleObject(req: NextRequest): boolean {
+  const accept = req.headers.get("accept") ?? "";
+  return accept.includes(SINGLE_OBJECT_ACCEPT);
+}
+
+function respondSingle(
+  req: NextRequest,
+  event: CareEvent | null,
+  status = 200,
+): NextResponse {
+  if (wantsSingleObject(req)) {
+    if (event == null) return new NextResponse("null", { status, headers: jsonHeaders });
+    return new NextResponse(JSON.stringify(event), { status, headers: jsonHeaders });
+  }
+  return NextResponse.json(event ? [event] : [], { status });
+}
+
+function respondMaybeSingle(req: NextRequest, events: CareEvent[]): NextResponse {
+  if (wantsSingleObject(req)) {
+    return new NextResponse(JSON.stringify(events[0] ?? null), {
+      status: 200,
+      headers: jsonHeaders,
+    });
+  }
+  return NextResponse.json(events, { status: 200 });
+}
+
+const jsonHeaders = { "content-type": "application/json" } as const;
+
+function filterCareEvents(rows: CareEvent[], params: URLSearchParams): CareEvent[] {
+  let out = rows;
+  for (const [key, raw] of params.entries()) {
+    if (key === "select" || key === "order" || key === "limit" || key === "offset") continue;
+    if (raw.startsWith("eq.")) {
+      const v = raw.slice(3);
+      out = out.filter((row) => String((row as unknown as Record<string, unknown>)[key]) === v);
+    } else if (raw === "is.null") {
+      out = out.filter((row) => (row as unknown as Record<string, unknown>)[key] == null);
+    } else if (raw === "not.is.null") {
+      out = out.filter((row) => (row as unknown as Record<string, unknown>)[key] != null);
+    } else if (raw.startsWith("gte.")) {
+      const v = raw.slice(4);
+      out = out.filter(
+        (row) => String((row as unknown as Record<string, unknown>)[key] ?? "") >= v,
+      );
+    }
+  }
+  return out;
+}
+
+function orderCareEvents(rows: CareEvent[], params: URLSearchParams): CareEvent[] {
+  const order = params.get("order");
+  if (!order) return rows;
+  const [field, direction = "asc"] = order.split(".");
+  const sorted = [...rows].sort((a, b) => {
+    const av = String((a as unknown as Record<string, unknown>)[field] ?? "");
+    const bv = String((b as unknown as Record<string, unknown>)[field] ?? "");
+    return av < bv ? -1 : av > bv ? 1 : 0;
+  });
+  if (direction === "desc") sorted.reverse();
+  return sorted;
+}
+
+function limitCareEvents(rows: CareEvent[], params: URLSearchParams): CareEvent[] {
+  const limit = params.get("limit");
+  if (!limit) return rows;
+  const n = Number(limit);
+  return Number.isFinite(n) ? rows.slice(0, n) : rows;
 }
 
 async function handle(req: NextRequest, ctx: { params: { path?: string[] } }): Promise<NextResponse> {
@@ -174,6 +263,63 @@ async function handle(req: NextRequest, ctx: { params: { path?: string[] } }): P
         deleted_at: null,
       },
     });
+  }
+
+  // -------- Care events ---------------------------------------------------
+  if (path === "/rest/v1/care_events" && method === "GET") {
+    const session = bearerSession(req);
+    if (!session) return NextResponse.json([], { status: 200 });
+    const url = new URL(req.url);
+    const filtered = filterCareEvents(careEvents, url.searchParams);
+    const ordered = orderCareEvents(filtered, url.searchParams);
+    const limited = limitCareEvents(ordered, url.searchParams);
+    return respondMaybeSingle(req, limited);
+  }
+
+  if (path === "/rest/v1/care_events" && method === "POST") {
+    const session = bearerSession(req);
+    if (!session) return NextResponse.json({ message: "unauthorized" }, { status: 401 });
+    const body = await readJson(req);
+    const now = new Date().toISOString();
+    const event: CareEvent = {
+      id: randomUUID(),
+      baby_id: String(body.baby_id ?? ""),
+      caregiver_id: String(body.caregiver_id ?? session.user.id),
+      night_shift_id: (body.night_shift_id as string | null) ?? null,
+      event_type: body.event_type as CareEvent["event_type"],
+      started_at: String(body.started_at ?? now),
+      ended_at: (body.ended_at as string | null) ?? null,
+      duration_seconds: (body.duration_seconds as number | null) ?? null,
+      metadata_json: (body.metadata_json as Record<string, unknown>) ?? {},
+      source: (body.source as CareEvent["source"]) ?? "manual",
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+    };
+    careEvents.push(event);
+    return respondSingle(req, event, 201);
+  }
+
+  if (path === "/rest/v1/care_events" && method === "PATCH") {
+    const session = bearerSession(req);
+    if (!session) return NextResponse.json({ message: "unauthorized" }, { status: 401 });
+    const body = await readJson(req);
+    const url = new URL(req.url);
+    const targets = filterCareEvents(careEvents, url.searchParams);
+    const now = new Date().toISOString();
+    const updated: CareEvent[] = [];
+    for (const target of targets) {
+      const idx = careEvents.indexOf(target);
+      if (idx === -1) continue;
+      const next: CareEvent = { ...target };
+      for (const [k, v] of Object.entries(body)) {
+        (next as unknown as Record<string, unknown>)[k] = v;
+      }
+      next.updated_at = now;
+      careEvents[idx] = next;
+      updated.push(next);
+    }
+    return respondSingle(req, updated[0] ?? null, 200);
   }
 
   if (path === "/rest/v1/babies" && method === "POST") {

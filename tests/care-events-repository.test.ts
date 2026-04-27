@@ -23,7 +23,7 @@ function row(overrides: Partial<CareEventsRow> = {}): CareEventsRow {
     started_at: "2026-01-01T03:00:00.000Z",
     ended_at: null,
     duration_seconds: null,
-    metadata_json: { method: "bottle", amount_ml: 90 },
+    metadata_json: { method: "bottle", amount: 90, unit: "ml", milk_type: "breastmilk" },
     source: "manual",
     created_at: "2026-01-01T03:00:00.000Z",
     updated_at: "2026-01-01T03:00:00.000Z",
@@ -42,7 +42,7 @@ describe("createCareEvent", () => {
       caregiver_id: CAREGIVER,
       event_type: "feed",
       started_at: "2026-01-01T03:00:00.000Z",
-      metadata_json: { method: "bottle", amount_ml: 90 },
+      metadata_json: { method: "bottle", amount: 90, unit: "ml", milk_type: "breastmilk" },
     });
 
     expect(result).toEqual(expected);
@@ -52,7 +52,12 @@ describe("createCareEvent", () => {
     expect(insertArg.source).toBe("manual");
     expect(insertArg.night_shift_id).toBeNull();
     expect(insertArg.duration_seconds).toBeNull();
-    expect(insertArg.metadata_json).toEqual({ method: "bottle", amount_ml: 90 });
+    expect(insertArg.metadata_json).toEqual({
+      method: "bottle",
+      amount: 90,
+      unit: "ml",
+      milk_type: "breastmilk",
+    });
   });
 
   it("rejects invalid input before touching Supabase", async () => {
@@ -64,7 +69,7 @@ describe("createCareEvent", () => {
         caregiver_id: CAREGIVER,
         event_type: "feed",
         started_at: "2026-01-01T03:00:00.000Z",
-        metadata_json: { method: "bottle" },
+        metadata_json: { method: "bottle", amount: 90, unit: "ml", milk_type: "breastmilk" },
       }),
     ).rejects.toThrow();
 
@@ -83,7 +88,7 @@ describe("createCareEvent", () => {
         caregiver_id: CAREGIVER,
         event_type: "feed",
         started_at: "2026-01-01T03:00:00.000Z",
-        metadata_json: { method: "bottle" },
+        metadata_json: { method: "bottle", amount: 90, unit: "ml", milk_type: "breastmilk" },
       }),
     ).rejects.toMatchObject({ message: "boom" });
   });

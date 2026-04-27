@@ -9,10 +9,18 @@ const baseFeed = {
 };
 
 describe("careEventInputSchema", () => {
-  it("accepts a valid feed event with method + amount", () => {
+  it("accepts a valid bottle feed event", () => {
     const result = careEventInputSchema.safeParse({
       ...baseFeed,
-      metadata_json: { method: "bottle", amount_ml: 90 },
+      metadata_json: { method: "bottle", amount: 90, unit: "ml", milk_type: "breastmilk" },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a valid breast feed event with side + duration", () => {
+    const result = careEventInputSchema.safeParse({
+      ...baseFeed,
+      metadata_json: { method: "breast", side: "left", duration_minutes: 12 },
     });
     expect(result.success).toBe(true);
   });
@@ -52,10 +60,18 @@ describe("careEventInputSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects a feed event with negative amount", () => {
+  it("rejects a bottle feed event with non-positive amount", () => {
     const result = careEventInputSchema.safeParse({
       ...baseFeed,
-      metadata_json: { method: "bottle", amount_ml: -1 },
+      metadata_json: { method: "bottle", amount: 0, unit: "ml", milk_type: "formula" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a bottle feed event missing milk_type", () => {
+    const result = careEventInputSchema.safeParse({
+      ...baseFeed,
+      metadata_json: { method: "bottle", amount: 60, unit: "oz" },
     });
     expect(result.success).toBe(false);
   });
@@ -63,7 +79,7 @@ describe("careEventInputSchema", () => {
   it("rejects a feed event with unknown metadata field", () => {
     const result = careEventInputSchema.safeParse({
       ...baseFeed,
-      metadata_json: { method: "bottle", weight_oz: 7 },
+      metadata_json: { method: "bottle", amount: 60, unit: "ml", milk_type: "formula", weight_oz: 7 },
     });
     expect(result.success).toBe(false);
   });
@@ -77,6 +93,15 @@ describe("careEventInputSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts a diaper event with contents=dry", () => {
+    const result = careEventInputSchema.safeParse({
+      ...baseFeed,
+      event_type: "diaper",
+      metadata_json: { contents: "dry" },
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("rejects a soothing event with unknown technique", () => {
     const result = careEventInputSchema.safeParse({
       ...baseFeed,
@@ -84,6 +109,27 @@ describe("careEventInputSchema", () => {
       metadata_json: { technique: "white-noise-machine" },
     });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts new soothing techniques (white_noise, skin_to_skin, ...)", () => {
+    for (const technique of [
+      "rocking",
+      "burping",
+      "swaddle",
+      "pacifier",
+      "white_noise",
+      "diaper_check",
+      "feeding_attempt",
+      "skin_to_skin",
+      "other",
+    ] as const) {
+      const result = careEventInputSchema.safeParse({
+        ...baseFeed,
+        event_type: "soothing",
+        metadata_json: { technique },
+      });
+      expect(result.success).toBe(true);
+    }
   });
 
   it("rejects a note event with empty text", () => {
