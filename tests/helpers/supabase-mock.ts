@@ -1,5 +1,5 @@
 import { vi, type Mock } from "vitest";
-import type { AppSupabaseClient } from "@/lib/supabase";
+import type { AppSupabaseClient } from "@/lib/supabase/browser";
 
 /**
  * Minimal mock of the chained `client.from(...).insert(...).select().single()`
@@ -18,6 +18,7 @@ export interface MockBuilder {
   eq: Mock;
   gte: Mock;
   is: Mock;
+  not: Mock;
   order: Mock;
   limit: Mock;
   single: Mock;
@@ -48,6 +49,7 @@ export function createMockSupabase<T>(result: Result<T>): MockSupabase {
   builder.eq = vi.fn(chain);
   builder.gte = vi.fn(chain);
   builder.is = vi.fn(chain);
+  builder.not = vi.fn(chain);
   builder.order = vi.fn(chain);
   builder.limit = vi.fn(chain);
 

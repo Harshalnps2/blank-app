@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { getCurrentUser } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
 
 const navLinks = [
   {
@@ -18,7 +21,9 @@ const navLinks = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const user = await getCurrentUser().catch(() => null);
+
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-8 px-5 py-10">
       <header className="space-y-2">
@@ -29,6 +34,15 @@ export default function HomePage() {
           off the night clearly.
         </p>
       </header>
+
+      {!user ? (
+        <Link
+          href="/login"
+          className="flex items-center justify-center rounded-2xl bg-night-accent px-5 py-4 text-base font-medium text-night-bg"
+        >
+          Sign in to get started
+        </Link>
+      ) : null}
 
       <nav aria-label="Primary" className="flex flex-col gap-3">
         {navLinks.map((link) => (

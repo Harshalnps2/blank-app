@@ -10,7 +10,7 @@
  * Supabase client is authenticated as the acting user.
  */
 
-import type { AppSupabaseClient } from "../supabase";
+import type { AppSupabaseClient } from "../supabase/browser";
 import type { CareEventsRow, CareEventType } from "../database.types";
 import {
   careEventInputSchema,

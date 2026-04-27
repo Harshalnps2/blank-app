@@ -115,3 +115,31 @@ export const careEventUpdateSchema = z
   .strict();
 
 export type CareEventUpdateInput = z.infer<typeof careEventUpdateSchema>;
+
+// -----------------------------------------------------------------------------
+// Auth + onboarding
+// -----------------------------------------------------------------------------
+
+export const emailSchema = z.string().trim().toLowerCase().email("Enter a valid email address.");
+
+export const otpTokenSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, "Enter the 6-digit code from your email.");
+
+export const feedingMethodSchema = z.enum(["breast", "bottle", "combo", "unknown"]);
+export type FeedingMethodName = z.infer<typeof feedingMethodSchema>;
+
+export const babyProfileInputSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Add a name (or nickname) for your baby.")
+    .max(80, "Name is too long."),
+  birth_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use the date picker to set a valid date."),
+  feeding_method: feedingMethodSchema,
+});
+
+export type BabyProfileInput = z.infer<typeof babyProfileInputSchema>;

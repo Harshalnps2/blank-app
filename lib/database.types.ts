@@ -9,6 +9,7 @@ export type CaregiverRole = "owner" | "caregiver";
 export type CareEventType = "feed" | "diaper" | "sleep" | "soothing" | "note";
 export type CareEventSource = "manual" | "ai_parsed" | "system";
 export type AuditAction = "insert" | "update" | "delete" | "soft_delete" | "restore";
+export type FeedingMethod = "breast" | "bottle" | "combo" | "unknown";
 
 export type Json =
   | string
@@ -34,17 +35,18 @@ interface CaregiverProfilesRow {
   updated_at: string;
 }
 
-interface BabiesRow {
+export interface BabiesRow {
   id: string;
   name: string;
   birth_date: string | null;
+  feeding_method: FeedingMethod;
   created_by: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
 }
 
-interface BabyCaregiversRow {
+export interface BabyCaregiversRow {
   baby_id: string;
   user_id: string;
   role: CaregiverRole;
@@ -179,6 +181,7 @@ export interface Database {
       care_event_type: CareEventType;
       care_event_source: CareEventSource;
       audit_action: AuditAction;
+      feeding_method: FeedingMethod;
     };
     CompositeTypes: { [_ in never]: never };
   };
